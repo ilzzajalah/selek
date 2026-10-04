@@ -1,0 +1,6 @@
+{
+  "name": "Seleksi Marga Zeverd",
+  "description": "Portal seleksi resmi editor Marga Zeverd dengan verifikasi otomatis caption video TikTok.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
