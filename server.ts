@@ -17,72 +17,78 @@ const WA_LINK = process.env.WA_GROUP_LINK || 'https://chat.whatsapp.com/GHYk8LpZ
 app.use(express.json({ limit: '2kb' }));
 
 app.post('/api/check', async (req: Request, res: Response<CheckRes>) => {
-  const ct = req.headers['content-type'];
-  if (!ct || !ct.includes('application/json')) {
-    return res.status(400).json({ success: false, error: 'Format harus application/json.' });
-  }
+  try {
+    const ct = req.headers['content-type'];
+    if (!ct || !ct.includes('application/json')) {
+      return res.status(400).json({ success: false, error: 'Format harus application/json.' });
+    }
 
-  // honeypot bot trap
-  if (req.body.website && String(req.body.website).trim().length > 0) {
-    return res.status(400).json({ success: false, error: 'Permintaan ditolak.' });
-  }
+    if (req.body.website && String(req.body.website).trim().length > 0) {
+      return res.status(400).json({ success: false, error: 'Permintaan ditolak.' });
+    }
 
-  const fwd = req.headers['x-forwarded-for'];
-  const ip = typeof fwd === 'string' ? fwd.split(',')[0].trim() : req.socket.remoteAddress || '127.0.0.1';
+    const fwd = req.headers['x-forwarded-for'];
+    const ip = typeof fwd === 'string' ? fwd.split(',')[0].trim() : req.socket.remoteAddress || '127.0.0.1';
 
-  const lim = checkRateLimit(ip);
-  if (!lim.ok) {
-    return res.status(429).json({ success: false, error: `Terlalu banyak request. Tunggu ${lim.wait}d.` });
-  }
+    const lim = checkRateLimit(ip);
+    if (!lim.ok) {
+      return res.status(429).json({ success: false, error: `Terlalu banyak request. Tunggu ${lim.wait} detik.` });
+    }
 
-  const chk = await verifyTurnstile(req.body.turnstileToken, ip);
-  if (!chk.ok) {
-    return res.status(400).json({ success: false, error: chk.err || 'Verifikasi captcha gagal.' });
-  }
+    const chk = await verifyTurnstile(req.body.turnstileToken, ip);
+    if (!chk.ok) {
+      return res.status(400).json({ success: false, error: chk.err || 'Verifikasi captcha gagal.' });
+    }
 
-  const body = checkSchema.safeParse(req.body);
-  if (!body.success) {
-    return res.status(400).json({ success: false, error: body.error.issues[0]?.message || 'Data tidak valid.' });
-  }
+    const body = checkSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ success: false, error: body.error.issues[0]?.message || 'Data tidak valid.' });
+    }
 
-  const { nama, link } = body.data;
-  const vid = await verifyTikTok(link);
+    const { nama, link } = body.data;
+    const vid = await verifyTikTok(link);
 
-  if (!vid.ok) {
-    return res.status(400).json({
-      success: false,
-      error: vid.err || 'Verifikasi video gagal.',
-      code: vid.code,
+    if (!vid.ok) {
+      return res.status(400).json({
+        success: false,
+        error: vid.err || 'Verifikasi video gagal.',
+        code: vid.code,
+        nama,
+        videoId: vid.id,
+        videoTitle: vid.caption,
+        hashtagsFound: vid.tags,
+        missingHashtags: vid.missing,
+      });
+    }
+
+    const vidKey = vid.id || vid.url || link;
+    if (isVidUsed(vidKey)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Video ini sudah pernah dipakai untuk pendaftaran.',
+        nama,
+        videoId: vid.id,
+        videoTitle: vid.caption,
+      });
+    }
+
+    saveVid(vidKey);
+
+    return res.json({
+      success: true,
+      message: `Lolos, ${nama}.`,
       nama,
       videoId: vid.id,
       videoTitle: vid.caption,
+      waLink: WA_LINK,
       hashtagsFound: vid.tags,
-      missingHashtags: vid.missing,
     });
-  }
-
-  const vidKey = vid.id || vid.url || link;
-  if (isVidUsed(vidKey)) {
-    return res.status(400).json({
+  } catch {
+    return res.status(500).json({
       success: false,
-      error: 'Video ini sudah pernah dipakai untuk pendaftaran.',
-      nama,
-      videoId: vid.id,
-      videoTitle: vid.caption,
+      error: 'Terjadi kesalahan sistem saat memproses. Silakan coba lagi.',
     });
   }
-
-  saveVid(vidKey);
-
-  return res.json({
-    success: true,
-    message: `Lolos, ${nama}.`,
-    nama,
-    videoId: vid.id,
-    videoTitle: vid.caption,
-    waLink: WA_LINK,
-    hashtagsFound: vid.tags,
-  });
 });
 
 async function start() {

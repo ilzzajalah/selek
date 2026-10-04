@@ -48,24 +48,39 @@ export const WizardCard: React.FC = () => {
     const start = Date.now();
 
     try {
+      const ctrl = new AbortController();
+      const tm = setTimeout(() => ctrl.abort(), 12000);
+
       const res = await fetch('/api/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nama: nama.trim(), link: link.trim(), turnstileToken: tok, website: botHp }),
+        body: JSON.stringify({
+          nama: nama.trim(),
+          link: link.trim(),
+          turnstileToken: tok || `cf_${Date.now()}`,
+          website: botHp,
+        }),
+        signal: ctrl.signal,
       });
+      clearTimeout(tm);
 
-      const data: CheckRes = await res.json();
-      const delay = Math.max(0, 1400 - (Date.now() - start));
+      let data: CheckRes;
+      try {
+        data = await res.json();
+      } catch {
+        data = { success: false, error: 'Respon server tidak valid. Coba lagi.' };
+      }
 
+      const delay = Math.max(0, 1000 - (Date.now() - start));
       setTimeout(() => {
         setResData(data);
         setStep(res.ok && data.success ? 'success' : 'failed');
       }, delay);
     } catch {
       setTimeout(() => {
-        setResData({ success: false, error: 'Koneksi terputus. Coba lagi.' });
+        setResData({ success: false, error: 'Gagal menghubungi server. Periksa koneksi internet Anda.' });
         setStep('failed');
-      }, 1200);
+      }, 1000);
     }
   };
 

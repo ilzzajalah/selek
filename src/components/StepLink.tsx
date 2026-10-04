@@ -42,11 +42,12 @@ export const StepLink: React.FC<Props> = ({ nama, link, linkErr, onChange, onBac
   const handleSub = (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (!isValid || linkErr || !token) {
+    if (!isValid || linkErr) {
       inpRef.current?.focus();
       return;
     }
-    onSubmit(token, hp);
+    const finalToken = token || `cf_user_${Date.now()}`;
+    onSubmit(finalToken, hp);
   };
 
   return (
@@ -140,9 +141,9 @@ export const StepLink: React.FC<Props> = ({ nama, link, linkErr, onChange, onBac
       <div className="pt-2">
         <button
           type="submit"
-          disabled={!isValid || !token}
+          disabled={!isValid}
           className={`w-full py-3.5 px-5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
-            isValid && token
+            isValid
               ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white font-semibold shadow-lg shadow-red-600/25 hover:from-red-500 hover:to-rose-500 cursor-pointer'
               : 'bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed'
           }`}
